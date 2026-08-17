@@ -65,7 +65,7 @@ fun CytisineApp() {
                 Card {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("Важно", fontWeight = FontWeight.Bold)
-                        Text("Это приложение только напоминает о приёме и не заменяет инструкцию к препарату или назначение врача. Перед стартом сверяйте дозировку и противопоказания с упаковкой вашего препарата.")
+                        Text("Это приложение включает звуковые будильники приёма и не заменяет инструкцию к препарату или назначение врача. Перед стартом сверяйте дозировку и противопоказания с упаковкой вашего препарата.")
                         TextButton(onClick = { showInfo = false }) { Text("Понятно") }
                     }
                 }
@@ -87,16 +87,16 @@ fun CytisineApp() {
                     Prefs.clearTaken(context)
                     ReminderScheduler.scheduleAll(context)
                     refresh++
-                }) { Text("Сохранить и включить напоминания") }
+                }) { Text("Сохранить и включить будильники") }
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                     val am = context.getSystemService(AlarmManager::class.java)
                     if (!am.canScheduleExactAlarms()) {
                         Spacer(Modifier.height(6.dp))
-                        Text("Точные будильники не разрешены: Android может немного сдвигать уведомления.", style = MaterialTheme.typography.bodySmall)
+                        Text("Разрешите точные будильники: без этого Android может сдвигать время звонка.", style = MaterialTheme.typography.bodySmall)
                         TextButton(onClick = {
                             val i = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:${context.packageName}"))
                             context.startActivity(i)
-                        }) { Text("Разрешить точные напоминания") }
+                        }) { Text("Разрешить точные будильники") }
                     }
                 }
             }
