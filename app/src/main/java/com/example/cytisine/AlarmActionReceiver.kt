@@ -5,6 +5,7 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 
 class AlarmActionReceiver : BroadcastReceiver() {
     companion object {
@@ -37,10 +38,15 @@ class AlarmActionReceiver : BroadcastReceiver() {
         )
         val am = context.getSystemService(AlarmManager::class.java)
         val at = System.currentTimeMillis() + 5 * 60_000L
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S && !am.canScheduleExactAlarms()) {
-            am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pi)
-        } else {
-            am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pi)
+
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || am.canScheduleExactAlarms()) {
+            val showIntent = PendingIntent.getActivity(
+                context,
+                35_000 + day * 10 + number,
+                Intent(context, MainActivity::class.java),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            am.setAlarmClock(AlarmManager.AlarmClockInfo(at, showIntent), pi)
         }
     }
 

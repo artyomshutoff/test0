@@ -33,6 +33,15 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent { MaterialTheme { CytisineApp() } }
     }
+
+    override fun onResume() {
+        super.onResume()
+        // If the user has just granted exact-alarm access, immediately replace
+        // any old schedule with true alarm-clock alarms.
+        if (Prefs.alarmsEnabled(this)) {
+            ReminderScheduler.scheduleAll(this)
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -85,14 +94,18 @@ fun CytisineApp() {
                 Button(onClick = {
                     Prefs.saveSchedule(context, startDate, firstTime)
                     Prefs.clearTaken(context)
-                    ReminderScheduler.scheduleAll(context)
+                    val armed = ReminderScheduler.scheduleAll(context)
                     refresh++
+                    if (!armed && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        val i = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:${context.packageName}"))
+                        context.startActivity(i)
+                    }
                 }) { Text("Сохранить и включить будильники") }
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                     val am = context.getSystemService(AlarmManager::class.java)
                     if (!am.canScheduleExactAlarms()) {
                         Spacer(Modifier.height(6.dp))
-                        Text("Разрешите точные будильники: без этого Android может сдвигать время звонка.", style = MaterialTheme.typography.bodySmall)
+                        Text("Для надёжного звонка в точное время требуется системный доступ к точным будильникам. После разрешения расписание включится автоматически.", style = MaterialTheme.typography.bodySmall)
                         TextButton(onClick = {
                             val i = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:${context.packageName}"))
                             context.startActivity(i)

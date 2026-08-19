@@ -14,8 +14,19 @@ object Prefs {
     fun firstTime(context: Context): LocalTime =
         LocalTime.parse(p(context).getString("first_time", "08:00"))
 
+    fun alarmsEnabled(context: Context): Boolean {
+        val prefs = p(context)
+        // Migration from previous versions: if a schedule was already saved,
+        // keep alarms enabled after updating the APK.
+        return prefs.getBoolean("alarms_enabled", prefs.contains("start_date"))
+    }
+
     fun saveSchedule(context: Context, date: LocalDate, time: LocalTime) {
-        p(context).edit().putString("start_date", date.toString()).putString("first_time", time.toString()).apply()
+        p(context).edit()
+            .putString("start_date", date.toString())
+            .putString("first_time", time.toString())
+            .putBoolean("alarms_enabled", true)
+            .apply()
     }
 
     fun markTaken(context: Context, dose: Dose) {
