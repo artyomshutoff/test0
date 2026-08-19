@@ -12,8 +12,23 @@ android {
         applicationId = "com.example.cytisine"
         minSdk = 26
         targetSdk = 36
-        versionCode = 3
-        versionName = "1.2"
+        versionCode = 4
+        versionName = "1.3"
+    }
+
+    signingConfigs {
+        create("cytisineDebug") {
+            storeFile = file("cytisine-debug.keystore")
+            storePassword = "cytisine123"
+            keyAlias = "cytisine_debug"
+            keyPassword = "cytisine123"
+        }
+    }
+
+    buildTypes {
+        getByName("debug") {
+            signingConfig = signingConfigs.getByName("cytisineDebug")
+        }
     }
 
     buildFeatures { compose = true }

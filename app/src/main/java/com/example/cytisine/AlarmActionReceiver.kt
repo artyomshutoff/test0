@@ -1,11 +1,8 @@
 package com.example.cytisine
 
-import android.app.AlarmManager
-import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 
 class AlarmActionReceiver : BroadcastReceiver() {
     companion object {
@@ -20,34 +17,16 @@ class AlarmActionReceiver : BroadcastReceiver() {
         if (day !in 1..25 || number <= 0) return
 
         when (intent.action) {
-            ACTION_TAKEN -> Prefs.markTaken(context, Dose(day, number, 0))
-            ACTION_SNOOZE -> snooze(context, day, number)
+            ACTION_TAKEN -> {
+                Prefs.markTaken(context, Dose(day, number, 0))
+                ReminderScheduler.cancelDose(context, day, number)
+            }
+            ACTION_SNOOZE -> {
+                val at = System.currentTimeMillis() + 5 * 60_000L
+                ReminderScheduler.scheduleSnooze(context, day, number, at)
+            }
         }
         stopAlarm(context)
-    }
-
-    private fun snooze(context: Context, day: Int, number: Int) {
-        val alarmIntent = Intent(context, ReminderReceiver::class.java).apply {
-            action = "com.example.cytisine.REMIND_SNOOZE"
-            putExtra("day", day)
-            putExtra("number", number)
-        }
-        val pi = PendingIntent.getBroadcast(
-            context, 5000 + day * 10 + number, alarmIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-        val am = context.getSystemService(AlarmManager::class.java)
-        val at = System.currentTimeMillis() + 5 * 60_000L
-
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || am.canScheduleExactAlarms()) {
-            val showIntent = PendingIntent.getActivity(
-                context,
-                35_000 + day * 10 + number,
-                Intent(context, MainActivity::class.java),
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-            am.setAlarmClock(AlarmManager.AlarmClockInfo(at, showIntent), pi)
-        }
     }
 
     private fun stopAlarm(context: Context) {

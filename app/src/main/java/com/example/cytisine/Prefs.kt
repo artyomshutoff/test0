@@ -16,8 +16,6 @@ object Prefs {
 
     fun alarmsEnabled(context: Context): Boolean {
         val prefs = p(context)
-        // Migration from previous versions: if a schedule was already saved,
-        // keep alarms enabled after updating the APK.
         return prefs.getBoolean("alarms_enabled", prefs.contains("start_date"))
     }
 
@@ -41,5 +39,50 @@ object Prefs {
         val e = prefs.edit()
         prefs.all.keys.filter { it.startsWith("taken_") }.forEach { e.remove(it) }
         e.apply()
+    }
+
+    fun setNeedsExactPermissionReschedule(context: Context, value: Boolean) {
+        p(context).edit().putBoolean("needs_exact_reschedule", value).apply()
+    }
+
+    fun needsExactPermissionReschedule(context: Context): Boolean =
+        p(context).getBoolean("needs_exact_reschedule", false)
+
+    fun recordAlarmDelivery(
+        context: Context,
+        day: Int,
+        number: Int,
+        expectedAt: Long,
+        receivedAt: Long,
+        isSnooze: Boolean
+    ) {
+        p(context).edit()
+            .putInt("last_alarm_day", day)
+            .putInt("last_alarm_number", number)
+            .putLong("last_alarm_expected", expectedAt)
+            .putLong("last_alarm_received", receivedAt)
+            .putBoolean("last_alarm_snooze", isSnooze)
+            .apply()
+    }
+
+    data class AlarmDelivery(
+        val day: Int,
+        val number: Int,
+        val expectedAt: Long,
+        val receivedAt: Long,
+        val isSnooze: Boolean
+    )
+
+    fun lastAlarmDelivery(context: Context): AlarmDelivery? {
+        val prefs = p(context)
+        val received = prefs.getLong("last_alarm_received", 0L)
+        if (received == 0L) return null
+        return AlarmDelivery(
+            day = prefs.getInt("last_alarm_day", 0),
+            number = prefs.getInt("last_alarm_number", 0),
+            expectedAt = prefs.getLong("last_alarm_expected", 0L),
+            receivedAt = received,
+            isSnooze = prefs.getBoolean("last_alarm_snooze", false)
+        )
     }
 }

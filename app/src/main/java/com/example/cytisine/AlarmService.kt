@@ -9,6 +9,7 @@ import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
@@ -18,12 +19,13 @@ class AlarmService : Service() {
     companion object {
         const val ACTION_START = "com.example.cytisine.ALARM_START"
         const val ACTION_STOP = "com.example.cytisine.ALARM_STOP"
-        const val CHANNEL_ID = "dose_alarms_v2"
+        const val CHANNEL_ID = "dose_alarms_v3"
         private const val NOTIFICATION_ID = 7001
     }
 
     private var player: MediaPlayer? = null
     private var vibrator: Vibrator? = null
+    private var wakeLock: PowerManager.WakeLock? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -39,17 +41,25 @@ class AlarmService : Service() {
 
         val day = intent?.getIntExtra("day", 0) ?: 0
         val number = intent?.getIntExtra("number", 0) ?: 0
+        val expectedAt = intent?.getLongExtra("expected_at", 0L) ?: 0L
+        val isSnooze = intent?.getBooleanExtra("is_snooze", false) ?: false
         if (day !in 1..25 || number <= 0) {
             stopSelf()
             return START_NOT_STICKY
         }
 
-        startForeground(NOTIFICATION_ID, buildNotification(day, number))
+        // AlarmManager now starts this FGS directly via PendingIntent, avoiding
+        // an extra BroadcastReceiver -> Service hop on a sleeping device.
+        val receivedAt = System.currentTimeMillis()
+        Prefs.recordAlarmDelivery(this, day, number, expectedAt, receivedAt, isSnooze)
+
+        startForeground(NOTIFICATION_ID, buildNotification(day, number, isSnooze))
         startSoundAndVibration()
+        acquireWakeLock()
         return START_NOT_STICKY
     }
 
-    private fun buildNotification(day: Int, number: Int): Notification {
+    private fun buildNotification(day: Int, number: Int, isSnooze: Boolean): Notification {
         val fullScreenIntent = Intent(this, AlarmActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             putExtra("day", day)
@@ -72,10 +82,11 @@ class AlarmService : Service() {
             )
         }
 
+        val text = if (isSnooze) "Отложенный сигнал • день $day, приём $number" else "День $day, приём $number"
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle("Цитизин — будильник")
-            .setContentText("День $day, приём $number")
+            .setContentText(text)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
@@ -86,6 +97,15 @@ class AlarmService : Service() {
             .addAction(0, "Принято", actionPending(AlarmActionReceiver.ACTION_TAKEN, 1000 + day * 10 + number))
             .addAction(0, "Отложить 5 мин", actionPending(AlarmActionReceiver.ACTION_SNOOZE, 2000 + day * 10 + number))
             .build()
+    }
+
+    private fun acquireWakeLock() {
+        if (wakeLock?.isHeld == true) return
+        val pm = getSystemService(PowerManager::class.java)
+        wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "cytisine:active-alarm").apply {
+            setReferenceCounted(false)
+            acquire(30 * 60_000L)
+        }
     }
 
     private fun startSoundAndVibration() {
@@ -122,6 +142,8 @@ class AlarmService : Service() {
         player = null
         vibrator?.cancel()
         vibrator = null
+        if (wakeLock?.isHeld == true) wakeLock?.release()
+        wakeLock = null
     }
 
     private fun createChannel() {
@@ -133,7 +155,7 @@ class AlarmService : Service() {
         ).apply {
             description = "Звуковые будильники по схеме приёма"
             lockscreenVisibility = Notification.VISIBILITY_PUBLIC
-            setSound(null, null) // звук воспроизводит AlarmService, чтобы он звонил до отключения
+            setSound(null, null)
             enableVibration(false)
         }
         nm.createNotificationChannel(channel)
